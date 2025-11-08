@@ -1,0 +1,370 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Order History</h2>
+    
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form id="filterForm" class="row g-3">
+                <div class="col-md-4">
+                    <label for="statusFilter" class="form-label">Status</label>
+                    <select class="form-select" id="statusFilter" name="status">
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="ready_for_pickup">Ready for Pickup</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="searchInput" class="form-label">Search</label>
+                    <input type="text" class="form-control" id="searchInput" name="search" placeholder="Search by email, name, or pickup code">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">Apply Filters</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Pickup Time</th>
+                            <th>Pickup Code</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody">
+                        <!-- Orders will be loaded here via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center" id="pagination">
+                    <!-- Pagination will be added here via JavaScript -->
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- Order Details Modal -->
+<div class="modal fade" id="orderDetailsModal" tabindex="-1" aria-labelledby="orderDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="orderDetailsModalLabel">Order Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="orderDetailsContent">
+                <!-- Order details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <div id="statusButtons">
+                    <!-- Status update buttons will be added here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ordersTableBody = document.getElementById('ordersTableBody');
+    const filterForm = document.getElementById('filterForm');
+    
+    // Load orders when page loads
+    loadOrders();
+    
+    // Handle filter form submission
+    filterForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        loadOrders();
+    });
+    
+    // Function to load orders with filters
+    function loadOrders(page = 1) {
+        const formData = new FormData(filterForm);
+        const params = new URLSearchParams();
+        
+        // Add filters to URL parameters
+        for (let [key, value] of formData.entries()) {
+            if (value) params.append(key, value);
+        }
+        
+        // Add pagination
+        params.append('page', page);
+        
+        // Make API request
+        fetch(`/api/orders/shopkeeper/?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                renderOrders(data.results);
+                renderPagination(data, page);
+            })
+            .catch(error => console.error('Error fetching orders:', error));
+    }
+    
+    // Function to render orders in the table
+    function renderOrders(orders) {
+        ordersTableBody.innerHTML = '';
+        
+        if (orders.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td colspan="8" class="text-center py-4">
+                    No orders found matching your criteria.
+                </td>
+            `;
+            ordersTableBody.appendChild(row);
+            return;
+        }
+        
+        orders.forEach(order => {
+            const row = document.createElement('tr');
+            row.style.cursor = 'pointer';
+            row.onclick = () => showOrderDetails(order.id);
+            
+            // Format order items
+            const itemsText = order.items.map(item => 
+                `${item.quantity}x ${item.product.name}`
+            ).join(', ');
+            
+            // Format pickup time
+            const pickupTime = order.pickup_slot ? 
+                new Date(order.pickup_slot.start_time).toLocaleString() : 'Not specified';
+            
+            // Status badge
+            const statusClass = {
+                'pending': 'bg-secondary',
+                'processing': 'bg-info',
+                'ready_for_pickup': 'bg-warning',
+                'completed': 'bg-success',
+                'cancelled': 'bg-danger'
+            }[order.status] || 'bg-secondary';
+            
+            row.innerHTML = `
+                <td>#${order.id}</td>
+                <td>${order.student.username || order.student.email}</td>
+                <td>${itemsText}</td>
+                <td>$${parseFloat(order.total_amount).toFixed(2)}</td>
+                <td>
+                    <span class="badge ${statusClass}">
+                        ${order.status.replace('_', ' ').toUpperCase()}
+                    </span>
+                </td>
+                <td>${pickupTime}</td>
+                <td>${order.pickup_code || 'N/A'}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" 
+                            onclick="event.stopPropagation(); showOrderDetails(${order.id})">
+                        View
+                    </button>
+                </td>
+            `;
+            
+            ordersTableBody.appendChild(row);
+        });
+    }
+    
+    // Function to render pagination
+    function renderPagination(data, currentPage) {
+        const pagination = document.getElementById('pagination');
+        pagination.innerHTML = '';
+        
+        if (!data.previous && !data.next) return;
+        
+        // Previous button
+        const prevLi = document.createElement('li');
+        prevLi.className = `page-item ${!data.previous ? 'disabled' : ''}`;
+        prevLi.innerHTML = `
+            <a class="page-link" href="#" ${data.previous ? `onclick="loadOrders(${currentPage - 1}); return false;"` : ''}>
+                &laquo; Previous
+            </a>
+        `;
+        pagination.appendChild(prevLi);
+        
+        // Page numbers
+        // Note: This is a simplified version. In a real app, you'd calculate page numbers based on count and page size
+        if (data.previous || data.next) {
+            const pageLi = document.createElement('li');
+            pageLi.className = 'page-item active';
+            pageLi.innerHTML = `<span class="page-link">Page ${currentPage}</span>`;
+            pagination.appendChild(pageLi);
+        }
+        
+        // Next button
+        const nextLi = document.createElement('li');
+        nextLi.className = `page-item ${!data.next ? 'disabled' : ''}`;
+        nextLi.innerHTML = `
+            <a class="page-link" href="#" ${data.next ? `onclick="loadOrders(${currentPage + 1}); return false;"` : ''}>
+                Next &raquo;
+            </a>
+        `;
+        pagination.appendChild(nextLi);
+    }
+    
+    // Function to show order details in modal
+    window.showOrderDetails = function(orderId) {
+        fetch(`/api/orders/${orderId}/`)
+            .then(response => response.json())
+            .then(order => {
+                // Format order items
+                const itemsHtml = order.items.map(item => `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <h6 class="mb-0">${item.product.name}</h6>
+                            <small class="text-muted">${item.quantity} x $${parseFloat(item.price_at_time_of_order).toFixed(2)}</small>
+                        </div>
+                        <div>
+                            $${(item.quantity * parseFloat(item.price_at_time_of_order)).toFixed(2)}
+                        </div>
+                    </div>
+                `).join('');
+                
+                // Format customer info
+                const customerInfo = `
+                    <div class="mb-4">
+                        <h5>Customer Information</h5>
+                        <p class="mb-1"><strong>Name:</strong> ${order.student.username || 'N/A'}</p>
+                        <p class="mb-1"><strong>Email:</strong> ${order.student.email}</p>
+                    </div>
+                `;
+                
+                // Format order info
+                const orderInfo = `
+                    <div class="mb-4">
+                        <h5>Order Information</h5>
+                        <p class="mb-1"><strong>Order ID:</strong> #${order.id}</p>
+                        <p class="mb-1"><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleString()}</p>
+                        <p class="mb-1"><strong>Status:</strong> 
+                            <span class="badge bg-primary">
+                                ${order.status.replace('_', ' ').toUpperCase()}
+                            </span>
+                        </p>
+                        <p class="mb-1"><strong>Pickup Code:</strong> ${order.pickup_code || 'N/A'}</p>
+                        ${order.pickup_slot ? `
+                            <p class="mb-1">
+                                <strong>Pickup Time:</strong> 
+                                ${new Date(order.pickup_slot.start_time).toLocaleString()} - 
+                                ${new Date(order.pickup_slot.end_time).toLocaleTimeString()}
+                            </p>
+                        ` : ''}
+                    </div>
+                `;
+                
+                // Format payment info
+                const paymentInfo = `
+                    <div class="mb-4">
+                        <h5>Payment Information</h5>
+                        <p class="mb-1"><strong>Subtotal:</strong> $${parseFloat(order.total_amount).toFixed(2)}</p>
+                        <p class="mb-1"><strong>Tax:</strong> $0.00</p>
+                        <p class="mb-0"><strong>Total:</strong> $${parseFloat(order.total_amount).toFixed(2)}</p>
+                    </div>
+                `;
+                
+                // Set modal content
+                document.getElementById('orderDetailsModalLabel').textContent = `Order #${order.id}`;
+                document.getElementById('orderDetailsContent').innerHTML = `
+                    ${customerInfo}
+                    ${orderInfo}
+                    <h5>Order Items</h5>
+                    <div class="mb-4">
+                        ${itemsHtml}
+                    </div>
+                    ${paymentInfo}
+                `;
+                
+                // Set status update buttons
+                const statusButtons = document.getElementById('statusButtons');
+                statusButtons.innerHTML = '';
+                
+                const statusOptions = [
+                    { value: 'processing', label: 'Mark as Processing', class: 'btn-info' },
+                    { value: 'ready_for_pickup', label: 'Ready for Pickup', class: 'btn-warning' },
+                    { value: 'completed', label: 'Mark as Completed', class: 'btn-success' },
+                    { value: 'cancelled', label: 'Cancel Order', class: 'btn-danger' }
+                ];
+                
+                statusOptions.forEach(option => {
+                    if (option.value !== order.status) {
+                        const button = document.createElement('button');
+                        button.className = `btn btn-sm ${option.class} ms-2`;
+                        button.textContent = option.label;
+                        button.onclick = () => updateOrderStatus(order.id, option.value);
+                        statusButtons.appendChild(button);
+                    }
+                });
+                
+                // Show the modal
+                const modal = new bootstrap.Modal(document.getElementById('orderDetailsModal'));
+                modal.show();
+            })
+            .catch(error => console.error('Error fetching order details:', error));
+    };
+    
+    // Function to update order status
+    window.updateOrderStatus = function(orderId, status) {
+        fetch(`/api/orders/${orderId}/status/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ status })
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Failed to update status');
+            return response.json();
+        })
+        .then(updatedOrder => {
+            // Close the modal and refresh the orders list
+            const modal = bootstrap.Modal.getInstance(document.getElementById('orderDetailsModal'));
+            modal.hide();
+            loadOrders();
+            
+            // Show success message
+            alert(`Order #${orderId} status updated to ${status.replace('_', ' ')}`);
+        })
+        .catch(error => {
+            console.error('Error updating order status:', error);
+            alert('Failed to update order status. Please try again.');
+        });
+    };
+    
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+{% endblock %}

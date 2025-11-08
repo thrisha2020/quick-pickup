@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopkeeper Dashboard - Quick Pick</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+        }
+        .btn-primary { 
+            background-color: #4f46e5;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: all 0.15s;
+        }
+        .btn-primary:hover {
+            background-color: #4338ca;
+        }
+        .btn-secondary {
+            background-color: white;
+            border: 1px solid #d1d5db;
+            color: #374151;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: all 0.15s;
+        }
+        .btn-secondary:hover {
+            background-color: #f9fafb;
+        }
+        .card {
+            background-color: white;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            padding: 1.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-gray-900">Quick Pick Shopkeeper</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="handleLogout()" class="btn-secondary">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Dashboard View -->
+        <div id="dashboard-view">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-2xl font-bold text-gray-800">Dashboard Overview</h2>
+                <div class="flex space-x-3">
+                    <button onclick="window.location.href='/auth/shopkeeper/signup/'" class="btn-secondary">Create Shopkeeper Account</button>
+                    <button onclick="printTodayReport()" class="btn-secondary">Print Report</button>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="card">
+                    <h3 class="text-gray-500 text-sm font-medium">Today's Orders</h3>
+                    <div id="today-orders" class="text-3xl font-bold text-indigo-600">0</div>
+                </div>
+                <div class="card">
+                    <h3 class="text-gray-500 text-sm font-medium">Today's Revenue</h3>
+                    <div id="today-revenue" class="text-3xl font-bold text-green-600">₹0.00</div>
+                </div>
+                <div class="card">
+                    <h3 class="text-gray-500 text-sm font-medium">Pending Orders</h3>
+                    <div id="pending-orders" class="text-3xl font-bold text-yellow-600">0</div>
+                </div>
+                <div class="card">
+                    <h3 class="text-gray-500 text-sm font-medium">Low Stock Items</h3>
+                    <div id="low-stock" class="text-3xl font-bold text-red-600">0</div>
+                </div>
+            </div>
+
+            <!-- Recent Orders -->
+            <div class="card mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Recent Orders</h3>
+                    <button onclick="showAllOrders()" class="text-indigo-600 hover:underline">View All</button>
+                </div>
+                <div id="recent-orders" class="overflow-x-auto"></div>
+            </div>
+
+            <!-- Inventory Summary -->
+            <div class="card">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Inventory Summary</h3>
+                    <button onclick="showInventory()" class="text-indigo-600 hover:underline">Manage Inventory</button>
+                </div>
+                <div id="inventory-summary" class="overflow-x-auto"></div>
+            </div>
+        </div>
+
+        <!-- Inventory Management View -->
+        <div id="inventory-view" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Inventory Management</h2>
+                <div class="flex space-x-3">
+                    <button onclick="showAddItemForm()" class="btn-primary">+ Add New Item</button>
+                    <button onclick="showDashboard()" class="btn-secondary">Back to Dashboard</button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow overflow-hidden mb-6">
+                <div class="p-4 border-b border-gray-200">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between space-y-3 md:space-y-0">
+                        <div class="relative flex-1 max-w-md">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <input type="text" id="search-inventory" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Search items...">
+                        </div>
+                        <div class="flex space-x-2">
+                            <select id="category-filter" class="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-lg">
+                                <option value="">All Categories</option>
+                                <option value="Writing">Writing</option>
+                                <option value="Paper">Paper</option>
+                                <option value="Instruments">Instruments</option>
+                                <option value="Office Supplies">Office Supplies</option>
+                                <option value="Service">Service</option>
+                            </select>
+                            <button onclick="filterInventory()" class="btn-secondary">Filter</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="inventory-list" class="divide-y divide-gray-200"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg hidden">
+        <span id="toast-message"></span>
+    </div>
+
+    <script>
+        let currentView = 'dashboard';
+        let inventory = [];
+        let orders = [];
+
+        const dashboardView = document.getElementById('dashboard-view');
+        const inventoryView = document.getElementById('inventory-view');
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMockData();
+            showDashboard();
+            setupEventListeners();
+        });
+
+        function loadMockData() {
+            inventory = [
+                { id: 1, name: 'A4 Notebook (200 Pgs)', price: 25.50, stock: 48, category: 'Paper', minStock: 20 },
+                { id: 2, name: 'Blue Gel Pen (Smooth Flow)', price: 15.00, stock: 120, category: 'Writing', minStock: 50 },
+                { id: 3, name: 'Scientific Calculator (FX-100)', price: 450.00, stock: 9, category: 'Instruments', minStock: 5 },
+                { id: 4, name: 'Whiteboard Marker (Black)', price: 15.00, stock: 59, category: 'Writing', minStock: 30 },
+                { id: 5, name: 'Stapler (Standard)', price: 120.00, stock: 8, category: 'Office Supplies', minStock: 10 },
+                { id: 6, name: 'Sticky Notes (3x3, Pack of 6)', price: 45.00, stock: 25, category: 'Office Supplies', minStock: 15 },
+                { id: 7, name: 'Geometry Box (Large)', price: 180.00, stock: 12, category: 'Instruments', minStock: 8 },
+                { id: 8, name: 'A4 Sheet (Pack of 100)', price: 80.00, stock: 35, category: 'Paper', minStock: 20 },
+                { id: 999, name: 'Custom Xeroxing Service', price: 0.50, stock: 9999, category: 'Service', minStock: 0 }
+            ];
+
+            const today = new Date().toISOString().split('T')[0];
+            orders = [
+                { 
+                    id: 101, 
+                    student: 'Student Priya', 
+                    date: today, 
+                    status: 'PENDING', 
+                    total: 155.50,
+                    items: [
+                        { name: 'A4 Notebook (200 Pgs)', quantity: 2, price: 25.50 },
+                        { name: 'Blue Gel Pen (Smooth Flow)', quantity: 5, price: 15.00 }
+                    ]
+                },
+                { 
+                    id: 102, 
+                    student: 'Student Arun', 
+                    date: today, 
+                    status: 'READY', 
+                    total: 450.00,
+                    items: [
+                        { name: 'Scientific Calculator (FX-100)', quantity: 1, price: 450.00 }
+                    ]
+                },
+                { 
+                    id: 103, 
+                    student: 'Student Bala', 
+                    date: today, 
+                    status: 'PENDING', 
+                    total: 25.00,
+                    items: [
+                        { name: 'Whiteboard Marker (Black)', quantity: 1, price: 15.00 },
+                        { name: 'Custom Xeroxing Service', quantity: 20, price: 0.50 }
+                    ]
+                }
+            ];
+        }
+
+        function showDashboard() {
+            currentView = 'dashboard';
+            dashboardView.classList.remove('hidden');
+            inventoryView.classList.add('hidden');
+            updateDashboard();
+        }
+
+        function showInventory() {
+            currentView = 'inventory';
+            dashboardView.classList.add('hidden');
+            inventoryView.classList.remove('hidden');
+            renderInventoryList();
+        }
+
+        function showAllOrders() {
+            showToast('Showing all orders');
+        }
+
+        function updateDashboard() {
+            const today = new Date().toISOString().split('T')[0];
+            const todayOrders = orders.filter(order => order.date === today);
+            const pendingOrders = orders.filter(order => order.status === 'PENDING').length;
+            const lowStockItems = inventory.filter(item => item.stock < item.minStock).length;
+            
+            document.getElementById('today-orders').textContent = todayOrders.length;
+            document.getElementById('today-revenue').textContent = 
+                '₹' + todayOrders.reduce((sum, order) => sum + order.total, 0).toFixed(2);
+            document.getElementById('pending-orders').textContent = pendingOrders;
+            document.getElementById('low-stock').textContent = lowStockItems;
+
+            renderRecentOrders();
+            renderInventorySummary();
+        }
+
+        function renderRecentOrders() {
+            const container = document.getElementById('recent-orders');
+            const recentOrders = [...orders].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+            
+            if (recentOrders.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4">No recent orders found.</p>';
+                return;
+            }
+
+            const ordersTable = `
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order #</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        ${recentOrders.map(order => {
+                            const statusClass = order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                                              order.status === 'READY' ? 'bg-green-100 text-green-800' :
+                                              'bg-gray-100 text-gray-800';
+                            const items = order.items.map(item => `${item.quantity}x ${item.name}`).join('<br>');
+                            
+                            return `
+                                <tr class="hover:bg-gray-50 cursor-pointer" onclick="viewOrderDetails(${order.id})">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#${order.id}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${order.student}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">${items}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹${order.total.toFixed(2)}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                                            ${order.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = ordersTable;
+        }
+
+        function renderInventorySummary() {
+            const container = document.getElementById('inventory-summary');
+            const lowStockItems = inventory.filter(item => item.stock < item.minStock);
+            
+            if (lowStockItems.length === 0) {
+                container.innerHTML = '<p class="text-green-600 text-center py-4">All items are well-stocked.</p>';
+                return;
+            }
+
+            const lowStockList = lowStockItems.slice(0, 3).map(item => 
+                `<li>${item.name} (${item.stock} left, min: ${item.minStock})</li>`
+            ).join('');
+            
+            const moreItems = lowStockItems.length > 3 ? 
+                `<li>... and ${lowStockItems.length - 3} more items</li>` : '';
+            
+            container.innerHTML = `
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-yellow-700">
+                                <span class="font-medium">Low Stock Alert!</span> You have ${lowStockItems.length} items that need attention.
+                            </p>
+                            <div class="mt-2 text-sm text-yellow-700">
+                                <ul class="list-disc pl-5 space-y-1">
+                                    ${lowStockList}
+                                    ${moreItems}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderInventoryList() {
+            const container = document.getElementById('inventory-list');
+            if (!container) return;
+            
+            const searchInput = document.getElementById('search-inventory');
+            const categorySelect = document.getElementById('category-filter');
+            
+            const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+            const categoryFilter = categorySelect ? categorySelect.value : '';
+            
+            let filteredItems = [...inventory];
+            
+            if (searchTerm) {
+                filteredItems = filteredItems.filter(item => 
+                    item.name.toLowerCase().includes(searchTerm) ||
+                    item.category.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            if (categoryFilter) {
+                filteredItems = filteredItems.filter(item => item.category === categoryFilter);
+            }
+            
+            if (filteredItems.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No items found.</p>';
+                return;
+            }
+
+            container.innerHTML = filteredItems.map(item => {
+                const isLowStock = item.stock < item.minStock;
+                const stockClass = isLowStock ? 'text-red-600 font-semibold' : 'text-gray-900';
+                const lowStockBadge = isLowStock ? '<span class="text-xs text-red-500 block">Low Stock!</span>' : '';
+                
+                return `
+                    <div class="p-4 hover:bg-gray-50 transition-colors">
+                        <div class="flex justify-between items-center">
+                            <div class="flex-1">
+                                <h4 class="font-medium text-gray-900">${item.name}</h4>
+                                <p class="text-sm text-gray-500">${item.category} • ₹${item.price.toFixed(2)}</p>
+                            </div>
+                            <div class="flex items-center space-x-6">
+                                <div class="text-right">
+                                    <p class="text-sm text-gray-500">Stock</p>
+                                    <p class="${stockClass}">${item.stock}</p>
+                                    ${lowStockBadge}
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button onclick="editItem(${item.id}, event)" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Edit</button>
+                                    <button onclick="deleteItem(${item.id}, event)" class="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showAddItemForm() {
+            const name = prompt('Enter item name:');
+            if (!name) return;
+            
+            const price = parseFloat(prompt('Enter price per unit:'));
+            if (isNaN(price) || price <= 0) {
+                showToast('Please enter a valid price', 'error');
+                return;
+            }
+            
+            const stock = parseInt(prompt('Enter initial stock quantity:', '0'));
+            if (isNaN(stock) || stock < 0) {
+                showToast('Please enter a valid stock quantity', 'error');
+                return;
+            }
+            
+            const categories = ['Writing', 'Paper', 'Instruments', 'Office Supplies', 'Service'];
+            const category = prompt(`Enter category (${categories.join(', ')}):`);
+            if (!category || !categories.includes(category)) {
+                showToast('Please enter a valid category', 'error');
+                return;
+            }
+            
+            const minStock = parseInt(prompt('Enter minimum stock level:', '10'));
+            if (isNaN(minStock) || minStock < 0) {
+                showToast('Please enter a valid minimum stock level', 'error');
+                return;
+            }
+            
+            const newItem = {
+                id: Math.max(0, ...inventory.map(i => i.id)) + 1,
+                name,
+                price,
+                stock,
+                category,
+                minStock
+            };
+            
+            inventory.push(newItem);
+            showToast('Item added successfully', 'success');
+            
+            if (currentView === 'inventory') {
+                renderInventoryList();
+            } else {
+                updateDashboard();
+            }
+        }
+
+        function editItem(itemId, event) {
+            if (event) event.stopPropagation();
+            
+            const item = inventory.find(i => i.id === itemId);
+            if (!item) {
+                showToast('Item not found', 'error');
+                return;
+            }
+            
+            const name = prompt('Enter item name:', item.name);
+            if (name === null) return;
+            
+            const price = parseFloat(prompt('Enter price per unit:', item.price));
+            if (isNaN(price) || price <= 0) {
+                showToast('Please enter a valid price', 'error');
+                return;
+            }
+            
+            const stock = parseInt(prompt('Enter stock quantity:', item.stock));
+            if (isNaN(stock) || stock < 0) {
+                showToast('Please enter a valid stock quantity', 'error');
+                return;
+            }
+            
+            const categories = ['Writing', 'Paper', 'Instruments', 'Office Supplies', 'Service'];
+            const category = prompt(`Enter category (${categories.join(', ')}):`, item.category);
+            if (!category || !categories.includes(category)) {
+                showToast('Please enter a valid category', 'error');
+                return;
+            }
+            
+            const minStock = parseInt(prompt('Enter minimum stock level:', item.minStock));
+            if (isNaN(minStock) || minStock < 0) {
+                showToast('Please enter a valid minimum stock level', 'error');
+                return;
+            }
+            
+            item.name = name;
+            item.price = price;
+            item.stock = stock;
+            item.category = category;
+            item.minStock = minStock;
+            
+            showToast('Item updated successfully', 'success');
+            
+            if (currentView === 'inventory') {
+                renderInventoryList();
+            } else {
+                updateDashboard();
+            }
+        }
+
+        function deleteItem(itemId, event) {
+            if (event) event.stopPropagation();
+            
+            if (!confirm('Are you sure you want to delete this item?')) return;
+            
+            const index = inventory.findIndex(i => i.id === itemId);
+            if (index === -1) {
+                showToast('Item not found', 'error');
+                return;
+            }
+            
+            inventory.splice(index, 1);
+            showToast('Item deleted successfully', 'success');
+            
+            if (currentView === 'inventory') {
+                renderInventoryList();
+            } else {
+                updateDashboard();
+            }
+        }
+
+        function viewOrderDetails(orderId) {
+            const order = orders.find(o => o.id === orderId);
+            if (!order) {
+                showToast('Order not found', 'error');
+                return;
+            }
+            
+            const itemsList = order.items.map(item => 
+                `- ${item.quantity}x ${item.name} @ ₹${item.price.toFixed(2)}`
+            ).join('\n');
+            
+            alert(`Order #${order.id} by ${order.student}\nStatus: ${order.status}\nTotal: ₹${order.total.toFixed(2)}\n\nItems:\n${itemsList}`);
+        }
+
+        function showToast(message, type = 'info') {
+            toastMessage.textContent = message;
+            
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500'
+            };
+            
+            toast.className = `fixed bottom-5 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg text-white ${colors[type] || colors.info}`;
+            toast.classList.remove('hidden');
+            
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        function printTodayReport() {
+            showToast('Preparing today\'s report...', 'info');
+            
+            setTimeout(() => {
+                const printWindow = window.open('', '_blank');
+                const today = new Date().toLocaleDateString();
+                const todayOrders = orders.filter(order => order.date === new Date().toISOString().split('T')[0]);
+                const totalRevenue = todayOrders.reduce((sum, order) => sum + order.total, 0);
+                
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Daily Report - ${today}</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; padding: 20px; }
+                            h1, h2 { color: #333; }
+                            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                            th { background-color: #f5f5f5; }
+                            @media print { .no-print { display: none; } }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Daily Sales Report</h1>
+                        <p>Date: ${today}</p>
+                        <h2>Summary</h2>
+                        <p>Total Orders: ${todayOrders.length}</p>
+                        <p>Total Revenue: ₹${totalRevenue.toFixed(2)}</p>
+                        <h2>Orders</h2>
+                        <table>
+                            <tr><th>Order #</th><th>Student</th><th>Items</th><th>Total</th><th>Status</th></tr>
+                            ${todayOrders.map(order => `
+                                <tr>
+                                    <td>#${order.id}</td>
+                                    <td>${order.student}</td>
+                                    <td>${order.items.map(item => `${item.quantity}x ${item.name}`).join('<br>')}</td>
+                                    <td>₹${order.total.toFixed(2)}</td>
+                                    <td>${order.status}</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                        <div class="no-print">
+                            <button onclick="window.print()">Print</button>
+                            <button onclick="window.close()">Close</button>
+                        </div>
+                        <script>window.onload = () => setTimeout(() => window.print(), 500);<\/script>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+            }, 1000);
+        }
+
+        function filterInventory() {
+            renderInventoryList();
+        }
+
+        function setupEventListeners() {
+            document.getElementById('search-inventory').addEventListener('input', () => {
+                if (currentView === 'inventory') renderInventoryList();
+            });
+            
+            window.handleLogout = function() {
+                if (confirm('Are you sure you want to logout?')) {
+                    showToast('Logged out successfully', 'success');
+                    setTimeout(() => window.location.href = 'login.html', 1000);
+                }
+            };
+        }
+    </script>
+</body>
+</html>

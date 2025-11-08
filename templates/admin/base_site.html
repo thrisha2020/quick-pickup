@@ -1,0 +1,17 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}Campus Cart Admin{% endblock %}
+
+{% block branding %}
+<h1 id="site-name"><a href="{% url 'admin:index' %}">Campus Cart Administration</a></h1>
+{% endblock %}
+
+{% block nav-global %}
+<div class="admin-nav">
+    <a href="{% url 'admin:index' %}" class="button">Dashboard</a>
+    <a href="{% url 'admin:api_product_changelist' %}" class="button">Manage Products</a>
+    <a href="{% url 'admin:api_userprofile_changelist' %}" class="button">Manage Users</a>
+    <a href="{% url 'admin:api_order_changelist' %}" class="button">View Orders</a>
+    <a href="/" class="button">View Site</a>
+</div>
+{% endblock %}

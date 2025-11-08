@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Cart | Shopkeeper Admin</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        html { font-family: 'Inter', sans-serif; }
+        body { background-color: #f8fafc; } /* Tailwind gray-50 */
+        .shadow-admin {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 5px 0 rgba(0, 0, 0, 0.05);
+        }
+        .btn-status { transition: background-color 0.2s, transform 0.2s; }
+        .btn-status:hover { transform: translateY(-1px); }
+        .view-hidden { display: none; }
+        .nav-tab { 
+            cursor: pointer;
+            transition: color 0.2s, border-color 0.2s;
+            border-bottom-width: 2px;
+            border-color: transparent;
+        }
+        .nav-tab.active {
+            border-color: #4f46e5;
+            color: #4f46e5;
+            font-weight: 700;
+        }
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.6); }
+    </style>
+</head>
+<body class="antialiased min-h-screen">
+    <!-- Firebase Imports and Initialization (Must be first JS) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, updateDoc, onSnapshot, collection, query, where, getDocs, setDoc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app-check.js"; // Removed this import to fix SyntaxError
+        
+        // Log level configuration removed to fix import error. Logging is now via console.log statements.
+        // if (typeof setLogLevel !== 'undefined') setLogLevel('Debug'); 
+
+        // Global variables provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+
+        if (firebaseConfig) {
+            window.firebaseApp = initializeApp(firebaseConfig);
+            window.db = getFirestore(window.firebaseApp);
+            window.auth = getAuth(window.firebaseApp);
+        } else {
+            console.error("Firebase configuration is missing.");
+        }
+        
+        // Expose Firestore paths and functions globally
+        window.getFirestoreReferences = () => {
+            const ordersPath = `/artifacts/${appId}/public/data/orders`;
+            const inventoryPath = `/artifacts/${appId}/public/data/inventory`;
+            return { ordersPath, inventoryPath };
+        };
+
+        // Handle Authentication
+        window.initAuth = async () => {
+            const auth = window.auth;
+            const initialToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+            
+            try {
+                if (initialToken) {
+                    await signInWithCustomToken(auth, initialToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Authentication Error:", error);
+            }
+            
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    window.isAdminLoggedIn = true;
+                    window.userId = user.uid;
+                    console.log("User authenticated:", window.userId);
+                } else {
+                    window.isAdminLoggedIn = false;
+                    window.userId = null;
+                    console.log("User signed out or anonymous.");
+                }
+                // Call initApp only after auth state is determined
+                window.initApp();
+            });
+        };
+
+        // Expose Firebase functions for use in global scope
+        window.updateDoc = updateDoc;
+        window.onSnapshot = onSnapshot;
+        window.collection = collection;
+        window.doc = doc;
+        window.query = query;
+        window.where = where;
+        window.getDocs = getDocs;
+        window.getDoc = getDoc;
+        window.deleteDoc = deleteDoc;
+        window.setDoc = setDoc; // Needed for initial inventory population if it runs out
+        window.getAuth = getAuth;
+        window.signOut = getAuth().signOut;
+    </script>
+    
+    <!-- Toast Notification -->
+    <div id="toast-notification" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[100] p-4 rounded-xl shadow-2xl text-white font-semibold transition-all duration-300 transform opacity-0 translate-y-full" style="min-width: 280px;">
+        <span id="toast-text"></span>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="fixed inset-0 modal-overlay z-[150] hidden flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm transform transition-all duration-300">
+            <h3 id="modal-title" class="text-xl font-bold text-gray-800 mb-4">Confirm Action</h3>
+            <p id="modal-message" class="text-gray-600 mb-6"></p>
+            <div class="flex justify-end space-x-3">
+                <button id="modal-cancel-btn" class="px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors">
+                    Cancel
+                </button>
+                <button id="modal-confirm-btn" class="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- 1. Login View -->
+        <section id="view-login" class="app-view">
+            <div class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-admin border border-gray-200 mt-20">
+                <div class="text-center mb-6">
+                    <h1 class="text-3xl font-bold text-indigo-700">Campus Cart</h1>
+                    <p class="text-gray-600 mt-2">Shopkeeper Admin Portal</p>
+                </div>
+                <form onsubmit="handleLogin(event)">
+                    <div class="mb-4">
+                        <label for="admin-username" class="block text-sm font-medium text-gray-700">Username</label>
+                        <input type="text" id="admin-username" required value="shopkeeper"
+                                class="mt-1 block w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div class="mb-6">
+                        <label for="admin-password" class="block text-sm font-medium text-gray-700">Password</label>
+                        <input type="password" id="admin-password" required value="admin123"
+                                class="mt-1 block w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-lg shadow-md">
+                        Secure Login
+                    </button>
+                </form>
+                <p class="mt-4 text-xs text-gray-500 text-center">Authentication handled by Canvas token (Mock credentials only bypass the UI)</p>
+            </div>
+        </section>
+
+        <!-- 2. Dashboard View (Orders & Code Check) -->
+        <section id="view-dashboard" class="app-view view-hidden">
+             <!-- Header and Logout -->
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <h1 class="text-3xl font-bold text-gray-800">Shop Dashboard</h1>
+                <button onclick="handleLogout()" class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-600 transition-colors">
+                    Logout
+                </button>
+            </div>
+            
+            <!-- Navigation Tabs -->
+            <div class="flex space-x-6 mb-6">
+                <button onclick="switchView('dashboard', true)" class="nav-tab active text-lg font-bold text-indigo-700 pb-2" data-view="dashboard">Orders & Fulfillment</button>
+                <button onclick="switchView('inventory', true)" class="nav-tab text-lg font-medium text-gray-500 hover:text-indigo-600 pb-2" data-view="inventory">Inventory Management</button>
+            </div>
+
+            <!-- Dashboard Stats Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white p-5 rounded-2xl shadow-admin border border-gray-200">
+                    <p class="text-sm font-medium text-gray-500">Today's Revenue</p>
+                    <p id="today-revenue" class="text-2xl font-extrabold text-green-600 mt-1">₹0.00</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-admin border border-gray-200">
+                    <p class="text-sm font-medium text-gray-500">New Orders (Today)</p>
+                    <p id="today-orders-count" class="text-2xl font-extrabold text-indigo-600 mt-1">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-admin border border-gray-200">
+                    <p class="text-sm font-medium text-gray-500">Orders to Prepare</p>
+                    <p id="pending-orders" class="text-2xl font-extrabold text-yellow-600 mt-1">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-admin border border-gray-200">
+                    <p class="text-sm font-medium text-gray-500">Low Stock Items</p>
+                    <p id="low-stock-count" class="text-2xl font-extrabold text-red-600 mt-1">0</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Pickup Code Check (QR/Code Lookup) -->
+                <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-admin border border-gray-200 h-fit sticky top-20">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Pickup Verification</h3>
+                    <form onsubmit="handlePickupCodeCheck(event)">
+                        <label for="pickup-code-input" class="block text-sm font-medium text-gray-700">Enter Pickup Code / Scan QR</label>
+                        <input type="text" id="pickup-code-input" required placeholder="E.g., QW3RTY"
+                                class="mt-1 block w-full p-3 border border-indigo-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 uppercase font-mono text-lg tracking-widest">
+                        <button type="submit" class="w-full mt-4 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-lg shadow-md">
+                            Check Code
+                        </button>
+                    </form>
+                    <div id="code-check-result" class="mt-4 text-center text-sm text-gray-600">
+                        Awaiting code input...
+                    </div>
+                </div>
+
+                <!-- Order List -->
+                <div class="lg:col-span-2 space-y-4">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Active Orders (Pending & Ready)</h3>
+                    <div id="orders-list" class="space-y-3">
+                        <p class="text-center text-gray-500 py-10">Loading orders...</p>
+                        <!-- Orders will be injected here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. Order Detail View -->
+        <section id="view-order-detail" class="app-view view-hidden">
+            <button onclick="switchView('dashboard')" class="text-indigo-600 hover:underline mb-4 flex items-center">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Back to Orders List
+            </button>
+            <div class="bg-white p-8 rounded-2xl shadow-admin border border-gray-200">
+                <h2 class="text-3xl font-bold text-gray-900 mb-6 border-b pb-2">Order Details #<span id="detail-order-id"></span></h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="text-sm text-gray-500">Student ID</p>
+                        <p id="detail-student-name" class="font-bold text-gray-800 text-lg"></p>
+                    </div>
+                    <div class="bg-indigo-50 p-4 rounded-lg">
+                        <p class="text-sm text-gray-500">Pickup Code</p>
+                        <p id="detail-pickup-code" class="font-extrabold text-indigo-700 text-xl tracking-widest"></p>
+                    </div>
+                    <div class="bg-yellow-50 p-4 rounded-lg">
+                        <p class="text-sm text-gray-500">Pickup Slot</p>
+                        <p id="detail-pickup-slot" class="font-bold text-gray-800 text-lg"></p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Items List -->
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">Items Ordered</h3>
+                        <ul id="detail-items-list" class="space-y-2 bg-gray-100 p-4 rounded-lg border border-gray-200">
+                            <li class="text-gray-500">Loading items...</li>
+                            <!-- Items injected here -->
+                        </ul>
+                    </div>
+                    
+                    <!-- Order Summary & Status -->
+                    <div class="flex flex-col space-y-6">
+                        <div class="p-4 bg-indigo-50 rounded-lg">
+                            <p class="text-sm text-gray-600">Payment (<span id="detail-payment-method" class="font-bold"></span>)</p>
+                            <p class="font-extrabold text-3xl text-indigo-800 mt-1">Total: <span id="detail-total-amount"></span></p>
+                        </div>
+                        
+                        <div class="p-4 bg-white border border-gray-300 rounded-lg">
+                            <p class="text-sm text-gray-500">Current Status</p>
+                            <p id="detail-status-current" class="font-bold text-2xl text-red-600"></p>
+                        </div>
+
+                        <h3 class="text-xl font-bold text-gray-800 border-t pt-4">Update Status</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button id="status-update-btn-ready" class="w-full bg-yellow-500 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-yellow-600 transition-colors">Ready for Pickup</button>
+                            <button id="status-update-btn-completed" class="w-full bg-green-500 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-green-600 transition-colors">Mark as Collected</button>
+                            <button id="status-update-btn-cancel" class="col-span-2 bg-gray-400 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-gray-500 transition-colors">Cancel Order</button>
+                        </div>
+                        <p class="text-xs text-red-500 pt-2">Note: Marking as collected fulfills the order.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. Inventory Management -->
+        <section id="view-inventory" class="app-view view-hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Inventory Management</h1>
+                <div class="flex space-x-3">
+                    <button onclick="showAddItemModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
+                        + Add New Item
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Search and Filter -->
+            <div class="bg-white rounded-xl shadow p-4 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0">
+                    <div class="relative flex-1 max-w-md">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <input id="inventory-search" type="text" oninput="renderInventoryList()" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Search items...">
+                    </div>
+                    <div class="flex space-x-2">
+                        <select id="category-filter" onchange="renderInventoryList()" class="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-lg">
+                            <option value="">All Categories</option>
+                            <option value="Writing">Writing</option>
+                            <option value="Paper">Paper</option>
+                            <option value="Instruments">Instruments</option>
+                            <option value="Service">Service</option>
+                            <option value="Office Supplies">Office Supplies</option>
+                        </select>
+                        <button onclick="renderInventoryList()" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                            <svg class="h-5 w-5 text-gray-700" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 4V2M15 12h2M12 18v2M9 12H7M4.22 19.78l1.42-1.42M19.78 4.22l-1.42 1.42M4.22 4.22l1.42 1.42M19.78 19.78l-1.42-1.42M12 6a6 6 0 100 12 6 6 0 000-12z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-admin overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Min Stock</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Price (₹)</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-table-body" class="bg-white divide-y divide-gray-200">
+                        <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">Loading inventory...</td></tr>
+                        <!-- Inventory items will be injected here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // --- GLOBAL STATE ---
+        window.isAdminLoggedIn = false;
+        window.orders = [];
+        window.inventory = [];
+        window.selectedOrder = null;
+        window.currentView = 'login';
+        
+        // Mock credentials for UI bypass (real auth is handled by Canvas token)
+        const MOCK_USERNAME = 'shopkeeper';
+        const MOCK_PASSWORD = 'admin123';
+        
+        // --- UTILITIES ---
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast-notification');
+            const toastText = document.getElementById('toast-text');
+            if (!toast || !toastText) return;
+            
+            toastText.textContent = message;
+            
+            toast.className = 'fixed bottom-5 left-1/2 -translate-x-1/2 z-[100] p-4 rounded-xl shadow-2xl text-white font-semibold transition-all duration-300 transform';
+            
+            if (type === 'error') toast.classList.add('bg-red-500');
+            else if (type === 'success') toast.classList.add('bg-green-500');
+            else if (type === 'warning') toast.classList.add('bg-yellow-500');
+            else toast.classList.add('bg-indigo-500');
+            
+            // Show the toast
+            setTimeout(() => {
+                toast.classList.add('opacity-100', 'translate-y-0');
+                toast.classList.remove('opacity-0', 'translate-y-full');
+                
+                // Hide after 5 seconds
+                setTimeout(() => {
+                    toast.classList.add('opacity-0', 'translate-y-full');
+                    toast.classList.remove('opacity-100', 'translate-y-0');
+                }, 5000);
+            }, 100);
+        }
+
+        function showConfirmationModal(title, message, onConfirm) {
+            const modal = document.getElementById('confirmation-modal');
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            
+            const confirmBtn = document.getElementById('modal-confirm-btn');
+            const cancelBtn = document.getElementById('modal-cancel-btn');
+            
+            // Clear previous listeners
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            const newCancelBtn = cancelBtn.cloneNode(true);
+            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+            modal.classList.remove('hidden');
+
+            newConfirmBtn.onclick = () => {
+                modal.classList.add('hidden');
+                onConfirm(true);
+            };
+            newCancelBtn.onclick = () => {
+                modal.classList.add('hidden');
+                onConfirm(false);
+            };
+        }
+
+        // --- AUTHENTICATION & NAVIGATION ---
+        function initApp() {
+            if (window.isAdminLoggedIn) {
+                switchView('dashboard');
+                // Data fetching starts via onSnapshot listeners
+            } else {
+                switchView('login');
+            }
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            const username = document.getElementById('admin-username').value;
+            const password = document.getElementById('admin-password').value;
+            
+            if (username === MOCK_USERNAME && password === MOCK_PASSWORD) {
+                // UI bypass for mock users, real auth is handled by the token
+                showToast("Login successful. Data is loaded using Canvas Auth Token.", 'success');
+                // The onAuthStateChanged listener handles the rest
+            } else {
+                showToast('Invalid credentials. Use shopkeeper / admin123 (UI Mock).', 'error');
+            }
+        }
+
+        function handleLogout() {
+            showConfirmationModal(
+                "Confirm Logout",
+                "Are you sure you want to log out of the Shopkeeper Admin Portal?",
+                async (confirmed) => {
+                    if (confirmed) {
+                        try {
+                            await window.signOut();
+                            window.isAdminLoggedIn = false;
+                            switchView('login');
+                            showToast('Logged out successfully.', 'info');
+                        } catch (error) {
+                            console.error("Logout failed:", error);
+                            showToast("Logout failed. Check console for details.", 'error');
+                        }
+                    }
+                }
+            );
+        }
+
+        function switchView(viewId, isNavTab = false) {
+            // Hide all views first
+            document.querySelectorAll('.app-view').forEach(view => {
+                view.classList.add('view-hidden');
+            });
+            
+            // Show the selected view
+            const targetView = document.getElementById(`view-${viewId}`);
+            if (targetView) {
+                targetView.classList.remove('view-hidden');
+                window.currentView = viewId;
+            }
+
+            if (isNavTab) {
+                // Update active tab styling
+                document.querySelectorAll('.nav-tab').forEach(tab => {
+                    tab.classList.remove('active');
+                    tab.classList.add('text-gray-500', 'hover:text-indigo-600');
+                });
+                
+                const activeTab = document.querySelector(`.nav-tab[data-view="${viewId}"]`);
+                if (activeTab) {
+                    activeTab.classList.add('active');
+                    activeTab.classList.remove('text-gray-500', 'hover:text-indigo-600');
+                }
+            }
+        }
+        
+        // --- FIRESTORE OPERATIONS ---
+
+        // 1. ORDERS LISTENER
+        function setupOrdersListener() {
+            if (!window.db || !window.isAdminLoggedIn) return;
+            const { ordersPath } = window.getFirestoreReferences();
+            const ordersCollection = window.collection(window.db, ordersPath);
+            
+            // Query for only PENDING or READY orders
+            const q = window.query(ordersCollection, 
+                window.where('status', 'in', ['PENDING', 'READY']));
+
+            window.onSnapshot(q, (snapshot) => {
+                window.orders = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                })).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); // Sort oldest first
+                
+                console.log("Orders updated:", window.orders.length);
+                renderOrderList();
+                updateDashboardStats(); // Update stats immediately after orders change
+            }, (error) => {
+                console.error("Error listening to orders:", error);
+                showToast("Real-time orders sync failed.", 'error');
+            });
+        }
+
+        // 2. INVENTORY LISTENER
+        function setupInventoryListener() {
+            if (!window.db || !window.isAdminLoggedIn) return;
+            const { inventoryPath } = window.getFirestoreReferences();
+            const inventoryCollection = window.collection(window.db, inventoryPath);
+            
+            window.onSnapshot(inventoryCollection, (snapshot) => {
+                window.inventory = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                console.log("Inventory updated:", window.inventory.length);
+                if (window.currentView === 'inventory') {
+                    renderInventoryList();
+                }
+                updateDashboardStats(); // Update low stock count
+            }, (error) => {
+                console.error("Error listening to inventory:", error);
+                showToast("Real-time inventory sync failed.", 'error');
+            });
+        }
+        
+        // --- ORDER FULFILLMENT LOGIC ---
+        
+        async function updateOrderStatus(orderId, newStatus) {
+            const order = window.orders.find(o => o.id === orderId);
+            if (!order) {
+                showToast("Order not found.", 'error');
+                return;
+            }
+
+            showConfirmationModal(
+                `Confirm Status Change`,
+                `Are you sure you want to change Order #${order.id} status from ${order.status} to **${newStatus}**?`,
+                async (confirmed) => {
+                    if (!confirmed) return;
+
+                    const { ordersPath } = window.getFirestoreReferences();
+                    const orderRef = window.doc(window.db, ordersPath, orderId);
+
+                    try {
+                        await window.updateDoc(orderRef, { status: newStatus });
+                        showToast(`Order #${order.id} updated to ${newStatus}.`, 'success');
+                        switchView('dashboard'); // Return to list view
+                    } catch (error) {
+                        console.error("Error updating order status:", error);
+                        showToast("Failed to update status. Check console.", 'error');
+                    }
+                }
+            );
+        }
+
+        async function handlePickupCodeCheck(event) {
+            event.preventDefault();
+            const codeInput = document.getElementById('pickup-code-input');
+            const code = codeInput.value.trim().toUpperCase();
+            const resultDiv = document.getElementById('code-check-result');
+            resultDiv.innerHTML = '<p class="text-indigo-500 font-semibold">Checking...</p>';
+
+            const order = window.orders.find(o => o.pickup_code === code && o.status !== 'COMPLETED' && o.status !== 'CANCELLED');
+
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            if (order) {
+                resultDiv.innerHTML = `
+                    <div class="p-4 bg-green-100 rounded-lg border border-green-300">
+                        <p class="font-bold text-green-700">Code Valid! Order #${order.id}</p>
+                        <p class="text-sm text-green-600">Student: ${order.student_username}</p>
+                        <p class="text-sm text-green-600">Items: ${order.items.length} | Status: ${order.status}</p>
+                        <button onclick="viewOrderDetails('${order.id}')" 
+                                class="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-1 px-3 rounded-md text-sm">
+                            View Order
+                        </button>
+                    </div>
+                `;
+                codeInput.value = ''; // Clear input on success
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="p-4 bg-red-100 rounded-lg border border-red-300">
+                        <p class="font-bold text-red-700">Invalid or Expired Code</p>
+                        <p class="text-sm text-red-600">No active order found with code: ${code}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // --- INVENTORY MANAGEMENT LOGIC ---
+
+        function showAddItemModal(item = null) {
+            // For simplicity, we use the confirmation modal as a prompt for adding/editing stock
+            const isEdit = item !== null;
+            const itemId = item ? item.id : new Date().getTime().toString();
+            
+            let htmlContent = `
+                <div class="space-y-4">
+                    <input type="text" id="modal-item-name" placeholder="Item Name" value="${isEdit ? item.name : ''}" required class="w-full p-2 border border-gray-300 rounded-lg">
+                    <select id="modal-item-category" class="w-full p-2 border border-gray-300 rounded-lg">
+                        <option value="">Select Category</option>
+                        ${['Writing', 'Paper', 'Instruments', 'Service', 'Office Supplies'].map(cat => 
+                            `<option value="${cat}" ${isEdit && item.category === cat ? 'selected' : ''}>${cat}</option>`
+                        ).join('')}
+                    </select>
+                    <input type="number" id="modal-item-price" placeholder="Price (₹)" value="${isEdit ? item.price : ''}" required step="0.01" class="w-full p-2 border border-gray-300 rounded-lg">
+                    <input type="number" id="modal-item-stock" placeholder="Stock Quantity" value="${isEdit ? item.stock_quantity : ''}" required class="w-full p-2 border border-gray-300 rounded-lg">
+                    <input type="number" id="modal-item-min-stock" placeholder="Min Stock Warning" value="${isEdit ? item.min_stock : ''}" required class="w-full p-2 border border-gray-300 rounded-lg">
+                </div>
+            `;
+            
+            // Custom Modal Implementation (using the existing structure for simplicity, but injecting custom HTML)
+            const modal = document.getElementById('confirmation-modal');
+            document.getElementById('modal-title').textContent = isEdit ? `Edit Item #${item.id}` : "Add New Item";
+            document.getElementById('modal-message').innerHTML = htmlContent;
+
+            const confirmBtn = document.getElementById('modal-confirm-btn');
+            confirmBtn.textContent = isEdit ? "Save Changes" : "Add Item";
+
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            
+            const cancelBtn = document.getElementById('modal-cancel-btn');
+            cancelBtn.onclick = () => modal.classList.add('hidden');
+
+            newConfirmBtn.onclick = () => {
+                const name = document.getElementById('modal-item-name').value;
+                const category = document.getElementById('modal-item-category').value;
+                const price = parseFloat(document.getElementById('modal-item-price').value);
+                const stock = parseInt(document.getElementById('modal-item-stock').value);
+                const minStock = parseInt(document.getElementById('modal-item-min-stock').value);
+                
+                if (!name || !category || isNaN(price) || isNaN(stock) || isNaN(minStock)) {
+                    showToast("Please fill all fields correctly.", 'warning');
+                    return;
+                }
+                
+                modal.classList.add('hidden');
+                handleInventoryAction(itemId, name, category, price, stock, minStock, isEdit);
+            };
+
+            modal.classList.remove('hidden');
+        }
+
+
+        async function handleInventoryAction(id, name, category, price, stock_quantity, min_stock, isEdit) {
+            const { inventoryPath } = window.getFirestoreReferences();
+            const itemRef = window.doc(window.db, inventoryPath, id.toString());
+            
+            const itemData = {
+                name,
+                category,
+                price: price,
+                stock_quantity: stock_quantity,
+                min_stock: min_stock,
+            };
+
+            if (!isEdit) {
+                // For new items, add creation timestamp
+                itemData.created_at = new Date().toISOString();
+            }
+
+            try {
+                await window.setDoc(itemRef, itemData, { merge: true });
+                showToast(isEdit ? `${name} updated successfully.` : `${name} added successfully.`, 'success');
+            } catch (error) {
+                console.error("Error saving inventory item:", error);
+                showToast(`Failed to ${isEdit ? 'update' : 'add'} item.`, 'error');
+            }
+        }
+        
+        function deleteItem(itemId) {
+            const item = window.inventory.find(i => i.id === itemId);
+            if (!item) return;
+
+            showConfirmationModal(
+                "Confirm Deletion",
+                `Are you sure you want to delete item **${item.name} (#${itemId})**? This action cannot be undone.`,
+                async (confirmed) => {
+                    if (!confirmed) return;
+                    
+                    const { inventoryPath } = window.getFirestoreReferences();
+                    const itemRef = window.doc(window.db, inventoryPath, itemId.toString());
+
+                    try {
+                        await window.deleteDoc(itemRef);
+                        showToast(`Item #${itemId} deleted successfully.`, 'success');
+                    } catch (error) {
+                        console.error("Error deleting item:", error);
+                        showToast("Failed to delete item. Check console for details.", 'error');
+                    }
+                }
+            );
+        }
+
+        // --- RENDERING FUNCTIONS ---
+        
+        function renderOrderList() {
+            const container = document.getElementById('orders-list');
+            if (!container) return;
+            
+            if (window.orders.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-10">No pending or active orders right now.</p>';
+                return;
+            }
+
+            container.innerHTML = window.orders.map(order => {
+                const statusColor = order.status === 'READY' ? 'bg-green-100 text-green-700 border-green-400' :
+                                    order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700 border-yellow-400' :
+                                    'bg-gray-100 text-gray-700 border-gray-400';
+                
+                return `
+                    <div class="bg-white p-4 rounded-xl border-l-4 ${statusColor} shadow-sm flex justify-between items-center space-x-4 hover:shadow-md transition duration-150 cursor-pointer" onclick="viewOrderDetails('${order.id}')">
+                        <div>
+                            <p class="font-bold text-lg text-gray-800">Order #${order.id} - ${order.student_username || 'N/A'}</p>
+                            <p class="text-sm text-gray-500">Slot: ${order.pickup_slot_display || 'N/A'} | Code: <span class="font-mono text-indigo-600">${order.pickup_code || 'N/A'}</span></p>
+                            <span class="text-xs ${statusColor.replace(/bg-.*|border-.*/g, 'text-')} mt-1 font-semibold">${order.status}</span>
+                        </div>
+                        <div class="flex flex-col items-end space-y-2">
+                            <p class="font-extrabold text-xl text-indigo-700">₹${(order.total_amount || 0).toFixed(2)}</p>
+                            <button onclick="event.stopPropagation(); viewOrderDetails('${order.id}')" class="text-sm bg-indigo-500 hover:bg-indigo-600 text-white font-semibold px-3 py-1 rounded-full">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function viewOrderDetails(orderId) {
+            window.selectedOrder = window.orders.find(o => o.id === orderId);
+            if (!window.selectedOrder) {
+                showToast("Order details not found.", 'error');
+                return;
+            }
+
+            const order = window.selectedOrder;
+            
+            document.getElementById('detail-order-id').textContent = order.id;
+            document.getElementById('detail-student-name').textContent = order.student_username || 'N/A';
+            document.getElementById('detail-total-amount').textContent = `₹${(order.total_amount || 0).toFixed(2)}`;
+            document.getElementById('detail-pickup-slot').textContent = order.pickup_slot_display || 'N/A';
+            document.getElementById('detail-pickup-code').textContent = order.pickup_code || 'N/A';
+            document.getElementById('detail-payment-method').textContent = order.payment_method || 'N/A';
+            document.getElementById('detail-status-current').textContent = order.status;
+
+            // Render Items List
+            const itemsHtml = (order.items || []).map(item => {
+                const itemPrice = item.price_at_order || 0; 
+                const itemTotal = itemPrice * item.quantity;
+                const isXerox = item.is_xerox_service;
+                
+                return `
+                    <li class="flex justify-between py-2 border-b border-gray-100 ${isXerox ? 'bg-red-50 p-2 rounded-lg' : ''}">
+                        <span class="text-gray-800">${item.product_name} x ${item.quantity}</span>
+                        <span class="font-semibold text-gray-700">₹${itemTotal.toFixed(2)} ${isXerox ? '(Service)' : ''}</span>
+                    </li>
+                `;
+            }).join('') || '<li class="text-gray-500">No items listed.</li>';
+            document.getElementById('detail-items-list').innerHTML = itemsHtml;
+            
+            // Set status button click handlers
+            document.getElementById('status-update-btn-ready').onclick = () => updateOrderStatus(order.id, 'READY');
+            document.getElementById('status-update-btn-completed').onclick = () => updateOrderStatus(order.id, 'COMPLETED');
+            document.getElementById('status-update-btn-cancel').onclick = () => updateOrderStatus(order.id, 'CANCELLED');
+
+            switchView('order-detail');
+        }
+
+        function renderInventoryList() {
+            const container = document.getElementById('inventory-table-body');
+            if (!container) return;
+            
+            // Get search and filter values
+            const searchTerm = document.getElementById('inventory-search')?.value.toLowerCase() || '';
+            const categoryFilter = document.getElementById('category-filter')?.value || '';
+            
+            // Filter inventory
+            let filteredItems = [...window.inventory];
+            
+            if (searchTerm) {
+                filteredItems = filteredItems.filter(item => 
+                    item.name.toLowerCase().includes(searchTerm) || 
+                    item.category.toLowerCase().includes(searchTerm) ||
+                    item.id.toString().includes(searchTerm)
+                );
+            }
+            
+            if (categoryFilter) {
+                filteredItems = filteredItems.filter(item => item.category === categoryFilter);
+            }
+            
+            if (filteredItems.length === 0) {
+                container.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                            No items found. Try adjusting your search or filters.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            // Render inventory items
+            container.innerHTML = filteredItems.map(item => {
+                const isLowStock = item.stock_quantity <= item.min_stock && item.category !== 'Service';
+                const stockClass = isLowStock ? 'text-red-600 font-semibold' : 'text-gray-700';
+                
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm text-gray-700">${item.id}</td>
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">${item.name}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">${item.category}</td>
+                        <td class="px-4 py-3 text-sm ${stockClass}">
+                            ${item.stock_quantity} ${isLowStock ? '(LOW)' : ''}
+                        </td>
+                         <td class="px-4 py-3 text-sm text-gray-500 text-right">${item.min_stock}</td>
+                        <td class="px-4 py-3 text-sm text-right text-gray-900">₹${item.price.toFixed(2)}</td>
+                        <td class="px-4 py-3 text-right text-sm font-medium">
+                            <button onclick="showAddItemModal({id: '${item.id}', name: '${item.name}', price: ${item.price}, stock_quantity: ${item.stock_quantity}, min_stock: ${item.min_stock}, category: '${item.category}'})" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
+                            <button onclick="deleteItem('${item.id}')" class="text-red-600 hover:text-red-900">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // Update dashboard statistics
+        function updateDashboardStats() {
+            if (!window.isAdminLoggedIn) return;
+            
+            // Today's date in YYYY-MM-DD format
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Filter today's orders (must check if order.created_at exists)
+            const todayOrders = window.orders.filter(order => {
+                if (!order.created_at) return false;
+                const orderDate = new Date(order.created_at).toISOString().split('T')[0];
+                return orderDate === today && order.status !== 'CANCELLED';
+            });
+            
+            // Calculate stats
+            const totalOrdersToday = todayOrders.length;
+            const totalRevenueToday = todayOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+            const pendingOrders = window.orders.filter(o => o.status === 'PENDING').length;
+            const lowStockItems = window.inventory.filter(item => item.stock_quantity <= item.min_stock && item.category !== 'Service').length;
+            
+            // Update UI
+            document.getElementById('today-orders-count').textContent = totalOrdersToday;
+            document.getElementById('today-revenue').textContent = `₹${totalRevenueToday.toFixed(2)}`;
+            document.getElementById('pending-orders').textContent = pendingOrders;
+            document.getElementById('low-stock-count').textContent = lowStockItems;
+        }
+
+        // --- INITIALIZATION ---
+        
+        // This function runs once after authentication state is determined (from firebase.js module)
+        window.initApp = function() {
+            if (window.isAdminLoggedIn) {
+                switchView('dashboard', true);
+                setupOrdersListener();
+                setupInventoryListener();
+            } else {
+                switchView('login');
+            }
+        };
+
+        // If Firebase is initialized, start the auth process.
+        if (window.firebaseApp) {
+            window.initAuth();
+        } else {
+            document.addEventListener('DOMContentLoaded', () => {
+                document.getElementById('orders-list').innerHTML = '<p class="text-center text-red-500 py-10">Firebase connection failed. Cannot load data.</p>';
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Quick Pick{% endblock %}</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        // On page load or when changing themes, best to add inline in `head` to avoid FOUC
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            @apply bg-white dark:bg-dark-900 text-gray-900 dark:text-gray-100 min-h-full;
+        }
+        .btn-primary {
+            @apply bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md transition-colors duration-200;
+        }
+        .btn-secondary {
+            @apply bg-gray-100 hover:bg-gray-200 dark:bg-dark-700 dark:hover:bg-dark-600 text-gray-800 dark:text-gray-200 px-4 py-2 rounded-md transition-colors duration-200;
+        }
+        .card {
+            @apply bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-dark-700;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-gray-50 dark:bg-dark-900 text-gray-900 dark:text-gray-100">
+    <div class="min-h-screen flex flex-col">
+        <!-- Navigation Bar -->
+        <nav class="bg-primary-600 dark:bg-primary-700 text-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <a href="/" class="text-xl font-bold">Campus Cart</a>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <!-- Theme Toggle -->
+                        <button id="theme-toggle" type="button" class="p-2 rounded-lg hover:bg-primary-500 dark:hover:bg-primary-600 transition-colors duration-200">
+                            <svg id="theme-toggle-dark-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
+                            </svg>
+                            <svg id="theme-toggle-light-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path>
+                            </svg>
+                        </button>
+                        
+                        {% if user.is_authenticated %}
+                            {% if user.is_staff or user.is_superuser %}
+                                <a href="/admin/" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-primary-500 dark:hover:bg-primary-600 transition-colors duration-200">Admin Dashboard</a>
+                            {% else %}
+                                <a href="/" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-primary-500 dark:hover:bg-primary-600 transition-colors duration-200">Home</a>
+                            {% endif %}
+                            <form action="{% url 'logout' %}" method="post" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-primary-500 dark:hover:bg-primary-600 transition-colors duration-200">Logout</button>
+                            </form>
+                        {% else %}
+                            <a href="{% url 'login' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-primary-500 dark:hover:bg-primary-600 transition-colors duration-200">Login</a>
+                            <a href="/admin-signup/" class="px-3 py-2 bg-white text-primary-600 rounded-md text-sm font-medium hover:bg-gray-100 dark:bg-gray-200 dark:hover:bg-gray-300 transition-colors duration-200">Admin Sign Up</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- Main Content -->
+        <main class="container mx-auto px-4 py-6">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="mb-4 p-4 text-white rounded {% if message.tags == 'error' %}bg-red-500{% else %}bg-green-500{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
+            {% block content %}
+            {% endblock %}
+        </main>
+    </div>
+    
+    {% block extra_js %}{% endblock %}
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg text-white hidden">
+        <span id="toast-message"></span>
+    </div>
+    
+    <!-- Theme Toggle Script -->
+    <script>
+        // Debug: Check if script is loaded
+        console.log('Theme toggle script loaded');
+        
+        // Wait for DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM fully loaded, initializing theme toggle');
+            
+            // Theme toggle functionality
+            const themeToggleBtn = document.getElementById('theme-toggle');
+            const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
+            const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
+
+            // Debug: Log elements
+            console.log('Theme toggle elements:', {
+                button: themeToggleBtn,
+                darkIcon: themeToggleDarkIcon,
+                lightIcon: themeToggleLightIcon
+            });
+
+            if (!themeToggleBtn || !themeToggleDarkIcon || !themeToggleLightIcon) {
+                console.error('One or more theme toggle elements not found!');
+                return;
+            }
+
+            // Function to set dark mode
+            function setDarkMode(isDark) {
+                if (isDark) {
+                    document.documentElement.classList.add('dark');
+                    themeToggleDarkIcon.classList.add('hidden');
+                    themeToggleLightIcon.classList.remove('hidden');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    themeToggleDarkIcon.classList.remove('hidden');
+                    themeToggleLightIcon.classList.add('hidden');
+                    localStorage.setItem('theme', 'light');
+                }
+            }
+
+            // Initialize theme based on localStorage or system preference
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const savedTheme = localStorage.getItem('theme');
+            
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                setDarkMode(true);
+            } else {
+                setDarkMode(false);
+            }
+
+            // Listen for toggle button click
+            themeToggleBtn.addEventListener('click', function() {
+                console.log('Theme toggle clicked');
+                const isDark = !document.documentElement.classList.contains('dark');
+                setDarkMode(isDark);
+            });
+            
+            console.log('Theme toggle initialization complete');
+        });
+    </script>
+    
+    <script>
+        // Show toast message
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            
+            // Set message and style based on type
+            toastMessage.textContent = message;
+            
+            // Reset classes
+            toast.className = 'fixed bottom-5 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg text-white';
+            
+            // Add type-specific classes
+            const typeClasses = {
+                'success': 'bg-green-500',
+                'error': 'bg-red-500',
+                'warning': 'bg-yellow-500',
+                'info': 'bg-blue-500'
+            };
+            
+            toast.classList.add(typeClasses[type] || 'bg-blue-500');
+            toast.classList.remove('hidden');
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+        
+        // Handle form submissions with AJAX
+        document.addEventListener('DOMContentLoaded', function() {
+            const forms = document.querySelectorAll('form[data-ajax]');
+            
+            forms.forEach(form => {
+                form.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(form);
+                    const url = form.getAttribute('action') || window.location.href;
+                    const method = form.getAttribute('method') || 'POST';
+                    
+                    try {
+                        const response = await fetch(url, {
+                            method: method,
+                            body: formData,
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                            }
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            if (data.redirect) {
+                                window.location.href = data.redirect;
+                            } else {
+                                showToast(data.message || 'Operation successful', 'success');
+                            }
+                        } else {
+                            showToast(data.error || 'An error occurred', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred. Please try again.', 'error');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

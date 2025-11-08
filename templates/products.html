@@ -1,0 +1,327 @@
+{% extends 'base.html' %}
+
+{% block title %}Products | Campus Cart{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-card {
+        transition: all 0.3s ease;
+        @apply bg-white dark:bg-dark-800 rounded-xl shadow-md overflow-hidden flex flex-col h-full border border-gray-200 dark:border-dark-700;
+    }
+    .product-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    }
+    .product-image {
+        @apply h-48 bg-gray-100 dark:bg-dark-700 flex items-center justify-center overflow-hidden;
+    }
+    .product-info {
+        @apply p-4 flex-grow flex flex-col;
+    }
+    .product-title {
+        @apply font-semibold text-lg mb-1 text-gray-900 dark:text-white;
+    }
+    .product-category {
+        @apply text-gray-600 dark:text-gray-300 text-sm mb-3 flex-grow;
+    }
+    .product-price {
+        @apply font-bold text-primary-600 dark:text-primary-400;
+    }
+    .product-stock {
+        @apply text-xs text-gray-500 dark:text-gray-400;
+    }
+    .add-to-cart-btn {
+        @apply bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full">
+        <div class="col-span-full bg-white dark:bg-dark-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-dark-700 mb-6">
+            <p class="text-gray-700 dark:text-gray-300 font-medium">
+                Showing <span class="text-primary-600 dark:text-primary-400 font-bold">6 products</span>
+            </p>
+        </div>
+        
+        <div class="col-span-full mt-2 mb-2">
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white border-b border-gray-200 dark:border-dark-700 pb-2">Stationery</h3>
+        </div>
+        
+        <!-- Product Card 1 -->
+        <div class="product-card">
+            <div class="product-image">
+                <img src="https://placehold.co/400x400/d1d5db/374151?text=Highlighter" alt="highlighter" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300">
+            </div>
+            <div class="product-info">
+                <h3 class="product-title">Highlighter</h3>
+                <p class="product-category">Marker</p>
+                <div class="flex justify-between items-center mt-auto">
+                    <div>
+                        <span class="product-price">₹20.00</span>
+                        <p class="product-stock available-quantity">10 available</p>
+                    </div>
+                    <button 
+                        onclick="addToCart(6)" 
+                        class="add-to-cart-btn"
+                            data-product-id="6"
+                        >
+                            Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Card 2 -->
+            <div class="product-card bg-white rounded-xl shadow-md overflow-hidden flex flex-col h-full">
+                <div class="h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
+                    <img src="https://placehold.co/400x400/d1d5db/374151?text=Marker" alt="marker" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300">
+                </div>
+                <div class="p-4 flex-grow flex flex-col">
+                    <h3 class="font-semibold text-lg mb-1">Marker</h3>
+                    <p class="text-gray-600 text-sm mb-3 flex-grow">Permanent marker</p>
+                    <div class="flex justify-between items-center mt-auto">
+                        <span class="font-bold text-indigo-600">₹25.00</span>
+                        <button onclick="addToCart(5)" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors">
+                            Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Card 3 -->
+            <div class="product-card bg-white rounded-xl shadow-md overflow-hidden flex flex-col h-full">
+                <div class="h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
+                    <img src="https://placehold.co/400x400/d1d5db/374151?text=Eraser" alt="eraser" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300">
+                </div>
+                <div class="p-4 flex-grow flex flex-col">
+                    <h3 class="font-semibold text-lg mb-1">Eraser</h3>
+                    <p class="text-gray-600 text-sm mb-3 flex-grow">Pencil mark remover</p>
+                    <div class="flex justify-between items-center mt-auto">
+                        <span class="font-bold text-indigo-600">₹10.00</span>
+                        <button onclick="addToCart(4)" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors">
+                            Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Card 4 -->
+            <div class="product-card bg-white rounded-xl shadow-md overflow-hidden flex flex-col h-full">
+                <div class="h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
+                    <img src="https://placehold.co/400x400/d1d5db/374151?text=Notebook" alt="notebook" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300">
+                </div>
+                <div class="p-4 flex-grow flex flex-col">
+                    <h3 class="font-semibold text-lg mb-1">Notebook</h3>
+                    <p class="text-gray-600 text-sm mb-3 flex-grow">200 pages, A4 size</p>
+                    <div class="flex justify-between items-center mt-auto">
+                        <span class="font-bold text-indigo-600">₹50.00</span>
+                        <button onclick="addToCart(3)" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors">
+                            Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-span-full mt-6 mb-2">
+                <h3 class="text-xl font-bold text-gray-900 border-b pb-2">Other Items</h3>
+            </div>
+
+            <!-- Product Card 5 -->
+            <div class="product-card bg-white rounded-xl shadow-md overflow-hidden flex flex-col h-full">
+                <div class="h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
+                    <img src="https://placehold.co/400x400/d1d5db/374151?text=Water+Bottle" alt="water bottle" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300">
+                </div>
+                <div class="p-4 flex-grow flex flex-col">
+                    <h3 class="font-semibold text-lg mb-1">Water Bottle</h3>
+                    <p class="text-gray-600 text-sm mb-3 flex-grow">1.5 liters, BPA Free</p>
+                    <div class="flex justify-between items-center mt-auto">
+                        <span class="font-bold text-indigo-600">₹150.00</span>
+                        <button onclick="addToCart(2)" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors">
+                            Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Function to get CSRF token from cookies
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Function to show debug information
+        function showDebugInfo(message, data = null) {
+            console.log(`[DEBUG] ${message}`, data || '');
+        }
+        
+        // Function to update the UI after adding to cart
+        function updateProductUI(productId, newQuantity) {
+            const button = document.querySelector(`button[data-product-id="${productId}"]`);
+            const quantityDisplay = button?.closest('.product-card')?.querySelector('.available-quantity');
+            
+            if (newQuantity <= 0) {
+                // Update button
+                if (button) {
+                    button.disabled = true;
+                    button.classList.add('opacity-50', 'cursor-not-allowed');
+                    button.textContent = 'Out of Stock';
+                }
+                // Update quantity display
+                if (quantityDisplay) {
+                    quantityDisplay.textContent = 'Out of stock';
+                    quantityDisplay.classList.add('text-red-500');
+                    quantityDisplay.classList.remove('text-gray-500');
+                }
+            } else {
+                // Update quantity display
+                if (quantityDisplay) {
+                    quantityDisplay.textContent = `${newQuantity} available`;
+                    quantityDisplay.classList.remove('text-red-500');
+                    quantityDisplay.classList.add('text-gray-500');
+                }
+            }
+        }
+
+        // Function to add product to cart
+        async function addToCart(productId) {
+            showDebugInfo('Adding product to cart', { productId });
+            
+            const button = document.querySelector(`button[data-product-id="${productId}"]`);
+            if (button && button.disabled) {
+                return; // Don't proceed if button is disabled
+            }
+            
+            // Show loading state
+            const originalText = button?.textContent || 'Add to Cart';
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="inline-block animate-spin mr-1">⏳</span> Adding...';
+            }
+            
+            const csrftoken = getCookie('csrftoken');
+            showDebugInfo('CSRF Token', csrftoken ? 'Found' : 'Not found');
+            
+            if (!csrftoken) {
+                alert('CSRF token not found. Please refresh the page and try again.');
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = originalText;
+                }
+                return;
+            }
+            
+            try {
+                const url = `/cart/add/${productId}/`;
+                showDebugInfo('Sending request to', url);
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        quantity: 1
+                    })
+                });
+
+                showDebugInfo('Response status', response.status);
+                
+                let data;
+                try {
+                    data = await response.json();
+                    showDebugInfo('Response data', data);
+                } catch (e) {
+                    console.error('Failed to parse JSON response:', e);
+                    throw new Error('Invalid server response');
+                }
+                
+                if (response.ok) {
+                    // Update the UI to reflect the new quantity
+                    if (data.available_quantity !== undefined) {
+                        updateProductUI(productId, data.available_quantity);
+                    }
+                    
+                    // Show success message
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg';
+                    successMsg.textContent = 'Added to cart!';
+                    document.body.appendChild(successMsg);
+                    
+                    // Remove the message after 2 seconds
+                    setTimeout(() => {
+                        successMsg.remove();
+                    }, 2000);
+                    
+                    // Update cart count
+                    updateCartCount();
+                } else {
+                    const errorMsg = data.error || 'Failed to add to cart';
+                    showDebugInfo('Error from server', errorMsg);
+                    
+                    if (data.available_quantity !== undefined) {
+                        updateProductUI(productId, data.available_quantity);
+                    }
+                    
+                    throw new Error(errorMsg);
+                }
+            } catch (error) {
+                console.error('Error details:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                });
+                
+                // Show error message
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded shadow-lg';
+                errorMsg.textContent = error.message || 'Failed to add to cart';
+                document.body.appendChild(errorMsg);
+                
+                // Remove the message after 3 seconds
+                setTimeout(() => {
+                    errorMsg.remove();
+                }, 3000);
+            } finally {
+                // Reset button state if it exists
+                if (button) {
+                    button.disabled = button.disabled; // Keep disabled if out of stock
+                    if (button.disabled) {
+                        button.textContent = 'Out of Stock';
+                    } else {
+                        button.textContent = originalText;
+                    }
+                }
+            }
+        }
+
+        // Function to update cart count in the UI
+        function updateCartCount() {
+            const cartCountElement = document.getElementById('cart-count');
+            if (cartCountElement) {
+                // You can fetch the latest cart count from the server or update it based on the response
+                // For now, we'll just increment the current count
+                const currentCount = parseInt(cartCountElement.textContent) || 0;
+                cartCountElement.textContent = currentCount + 1;
+            }
+        }
+    </script>
+</body>
+</html>

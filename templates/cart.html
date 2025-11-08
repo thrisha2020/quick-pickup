@@ -1,0 +1,271 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-6">Your Shopping Cart</h1>
+    
+    {% if cart.items.exists %}
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="hidden md:grid grid-cols-12 bg-gray-100 p-4 font-medium text-gray-600">
+            <div class="col-span-6">Product</div>
+            <div class="col-span-2 text-center">Price</div>
+            <div class="col-span-2 text-center">Quantity</div>
+            <div class="col-span-2 text-right">Total</div>
+        </div>
+        
+        <div id="cart-items">
+            {% for item in cart.items.all %}
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 border-b border-gray-200 items-center" data-item-id="{{ item.id }}">
+                <div class="col-span-6 flex items-center space-x-4">
+                    <img src="{{ item.product.image.url|default:'/static/images/placeholder.png' }}" 
+                         alt="{{ item.product.name }}" 
+                         class="w-20 h-20 object-cover rounded">
+                    <div>
+                        <h3 class="font-medium">{{ item.product.name }}</h3>
+                        <p class="text-sm text-gray-500">{{ item.product.description|truncatechars:50 }}</p>
+                    </div>
+                </div>
+                
+                <div class="col-span-2 text-center">
+                    <span class="md:hidden font-medium">Price: </span>
+                    <span class="text-gray-800">₹{{ item.product.price|floatformat:2 }}</span>
+                </div>
+                
+                <div class="col-span-2">
+                    <div class="flex items-center justify-center space-x-2">
+                        <button data-item-id="{{ item.id }}" data-action="decrease" 
+                                class="quantity-btn w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-100">-</button>
+                        <input type="number" 
+                               value="{{ item.quantity }}" 
+                               min="1" 
+                               class="quantity-input w-16 text-center border rounded"
+                               data-item-id="{{ item.id }}">
+                        <button data-item-id="{{ item.id }}" data-action="increase"
+                                class="quantity-btn w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-100">+</button>
+                    </div>
+                </div>
+                
+                <div class="col-span-2 flex items-center justify-end space-x-4">
+                    <span class="item-total text-gray-800 font-medium" data-item-id="{{ item.id }}">
+                        ₹{{ item.total_price|floatformat:2 }}
+                    </span>
+                    <button data-item-id="{{ item.id }}" class="remove-item text-red-500 hover:text-red-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="p-6 bg-gray-50 border-t border-gray-200">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-gray-600">Subtotal (<span class="cart-total-items">{{ cart.total_items }}</span> items)</p>
+                    <p class="text-sm text-gray-500">Shipping and taxes calculated at checkout.</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-2xl font-bold cart-subtotal">₹{{ cart.subtotal|floatformat:2 }}</p>
+                    <a href="{% url 'checkout' %}" 
+                       class="mt-4 inline-block bg-indigo-600 text-white px-6 py-3 rounded-md font-medium hover:bg-indigo-700">
+                        Proceed to Checkout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-12">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <h2 class="mt-4 text-xl font-medium text-gray-900">Your cart is empty</h2>
+        <p class="mt-2 text-gray-500">Looks like you haven't added any items to your cart yet.</p>
+        <a href="{% url 'home' %}" 
+           class="mt-6 inline-block bg-indigo-600 text-white px-6 py-3 rounded-md font-medium hover:bg-indigo-700">
+            Continue Shopping
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Initialize cart data from Django template -->
+<script type="application/json" id="cart-data">
+{
+    "totalItems": {{ cart.total_items|default:0 }},
+    "subtotal": {{ cart.subtotal|default:0 }}
+}
+</script>
+
+<script>
+// Parse the cart data from the JSON script tag
+const cartData = JSON.parse(document.getElementById('cart-data').textContent);
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Event delegation for quantity buttons
+    document.addEventListener('click', async function(e) {
+        const button = e.target.closest('.quantity-btn');
+        if (!button) return;
+
+        const itemId = button.dataset.itemId;
+        const action = button.dataset.action;
+        const input = document.querySelector(`.quantity-input[data-item-id="${itemId}"]`);
+        
+        if (!input) return;
+        
+        let quantity = parseInt(input.value) || 1;
+        
+        if (action === 'increase') {
+            quantity += 1;
+        } else if (action === 'decrease' && quantity > 1) {
+            quantity -= 1;
+        } else {
+            return; // Don't update if quantity would be less than 1
+        }
+        
+        await updateQuantity(itemId, quantity);
+    });
+
+    // Handle direct input changes
+    document.addEventListener('change', async function(e) {
+        if (!e.target.classList.contains('quantity-input')) return;
+        
+        const itemId = e.target.dataset.itemId;
+        const quantity = parseInt(e.target.value) || 1;
+        
+        if (quantity < 1) {
+            e.target.value = 1;
+            return;
+        }
+        
+        await updateQuantity(itemId, quantity);
+    });
+
+    // Handle remove item
+    document.addEventListener('click', async function(e) {
+        const button = e.target.closest('.remove-item');
+        if (!button) return;
+        
+        const itemId = button.dataset.itemId;
+        await removeFromCart(itemId);
+    });
+
+        // Initialize cart summary from server
+    updateCartCount();
+});
+
+async function updateQuantity(itemId, quantity) {
+    try {
+        const response = await fetch(`/cart/update/${itemId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFTTOKEN': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ quantity: quantity })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            // Update the input value
+            const input = document.querySelector(`.quantity-input[data-item-id="${itemId}"]`);
+            if (input) input.value = quantity;
+            
+            // Update the item total
+            const itemTotal = document.querySelector(`.item-total[data-item-id="${itemId}"]`);
+            if (itemTotal) itemTotal.textContent = `₹${data.item_total.toFixed(2)}`;
+            
+            // Update the cart summary
+            updateCartSummary(data.total_items, data.subtotal);
+        } else {
+            alert(data.error || 'Failed to update quantity');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred while updating the cart');
+    }
+}
+
+async function removeFromCart(itemId) {
+    if (!confirm('Are you sure you want to remove this item from your cart?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/cart/remove/${itemId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFTTOKEN': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            // Remove the item from the DOM
+            const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
+            if (itemElement) {
+                itemElement.remove();
+                
+                // Update cart summary
+                updateCartSummary(data.total_items, data.subtotal);
+                
+                // If cart is empty, show empty cart message
+                if (data.total_items === 0) {
+                    window.location.reload();
+                }
+            } else {
+                window.location.reload();
+            }
+        } else {
+            alert('Failed to remove item from cart');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred while removing the item');
+    }
+}
+
+function updateCartSummary(totalItems, subtotal) {
+    // Update the cart summary in the header/navbar if it exists
+    const cartCountElement = document.getElementById('cart-count');
+    if (cartCountElement) {
+        cartCountElement.textContent = totalItems;
+    }
+    
+    // Update the cart summary in the cart page
+    const totalItemsElement = document.querySelector('.cart-total-items');
+    if (totalItemsElement) {
+        totalItemsElement.textContent = totalItems;
+    }
+    
+    const subtotalElement = document.querySelector('.cart-subtotal');
+    if (subtotalElement) {
+        subtotalElement.textContent = `₹${parseFloat(subtotal).toFixed(2)}`;
+    }
+}
+
+// Update cart count on page load
+async function updateCartCount() {
+    try {
+        const response = await fetch('/cart/summary/');
+        if (!response.ok) {
+            // If not logged in or other error, use template variables
+            updateCartSummary(cartData.totalItems, cartData.subtotal);
+            return;
+        }
+        
+        const data = await response.json();
+        updateCartSummary(data.total_items, data.subtotal);
+    } catch (error) {
+        console.error('Error fetching cart summary:', error);
+        // Fallback to template variables
+        updateCartSummary(cartData.totalItems, cartData.subtotal);
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,155 @@
+{% extends "admin/base_site.html" %}
+{% load humanize %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* Custom styles for the admin dashboard */
+    .dashboard-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-card {
+        background: #fff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stat-card h3 {
+        margin-top: 0;
+        color: #666;
+        font-size: 14px;
+        text-transform: uppercase;
+    }
+    
+    .stat-card .value {
+        font-size: 28px;
+        font-weight: bold;
+        color: #333;
+        margin: 10px 0;
+    }
+    
+    .recent-orders {
+        background: #fff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-top: 30px;
+    }
+    
+    .recent-orders h2 {
+        margin-top: 0;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    th, td {
+        text-align: left;
+        padding: 12px 15px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+    }
+    
+    tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .status-completed {
+        color: #28a745;
+    }
+    
+    .status-pending {
+        color: #ffc107;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <h1>Dashboard</h1>
+    
+    <div class="dashboard-stats">
+        <div class="stat-card">
+            <h3>Total Revenue</h3>
+            <div class="value">₹{{ total_revenue|floatformat:2|intcomma }}</div>
+            <p>All-time sales</p>
+        </div>
+        
+        <div class="stat-card">
+            <h3>Monthly Revenue</h3>
+            <div class="value">₹{{ monthly_revenue|floatformat:2|intcomma }}</div>
+            <p>This month</p>
+        </div>
+        
+        <div class="stat-card">
+            <h3>Total Products</h3>
+            <div class="value">{{ product_count }}</div>
+            <p>Active products in store</p>
+        </div>
+    </div>
+    
+    <div class="recent-orders">
+        <h2>Recent Orders</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Customer</th>
+                    <th>Date</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in recent_orders %}
+                <tr>
+                    <td><a href="{% url 'admin:api_order_change' order.id %}">#{{ order.id }}</a></td>
+                    <td>{{ order.user.get_full_name|default:order.user.username }}</td>
+                    <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
+                    <td>₹{{ order.total_amount|floatformat:2 }}</td>
+                    <td class="status-{{ order.status|lower }}">{{ order.get_status_display }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align: center;">No recent orders found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div style="margin-top: 20px; text-align: right;">
+            <a href="{% url 'admin:api_order_changelist' %}" class="button">View All Orders</a>
+        </div>
+    </div>
+    
+    <div class="recent-orders" style="margin-top: 30px;">
+        <h2>Quick Actions</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
+            <a href="{% url 'admin:api_product_add' %}" class="button" style="display: block; padding: 15px; text-align: center; background: #4CAF50; color: white; text-decoration: none; border-radius: 4px;">
+                Add New Product
+            </a>
+            <a href="{% url 'admin:api_product_changelist' %}" class="button" style="display: block; padding: 15px; text-align: center; background: #2196F3; color: white; text-decoration: none; border-radius: 4px;">
+                Manage Products
+            </a>
+            <a href="{% url 'admin:api_order_add' %}" class="button" style="display: block; padding: 15px; text-align: center; background: #FF9800; color: white; text-decoration: none; border-radius: 4px;">
+                Create New Order
+            </a>
+            <a href="{% url 'admin:auth_user_add' %}" class="button" style="display: block; padding: 15px; text-align: center; background: #9C27B0; color: white; text-decoration: none; border-radius: 4px;">
+                Add New User
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

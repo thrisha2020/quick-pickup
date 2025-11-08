@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Pick - Student Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .product-card {
+            transition: transform 0.2s;
+        }
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .cart-item {
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">Quick Pick</a>
+            <div class="ms-auto d-flex">
+                <button class="btn btn-light me-2" data-bs-toggle="modal" data-bs-target="#loginModal">Login</button>
+                <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#registerModal">Register</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <!-- Products List -->
+            <div class="col-md-8">
+                <h2>Available Products</h2>
+                <div class="row" id="products-container">
+                    <!-- Products will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Cart -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Your Cart</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="cart-items">
+                            <p class="text-muted">Your cart is empty</p>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between mb-3">
+                            <strong>Total:</strong>
+                            <span id="cart-total">₹0.00</span>
+                        </div>
+                        <button class="btn btn-primary w-100" id="checkout-btn" disabled>Proceed to Checkout</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="modal fade" id="loginModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Login</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="login-form">
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" name="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Login</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div class="modal fade" id="registerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Register</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="register-form">
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" name="password1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Confirm Password</label>
+                            <input type="password" class="form-control" name="password2" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" name="phone_number" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Register</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div class="modal fade" id="checkoutModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Checkout</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="checkout-form">
+                        <div class="mb-3">
+                            <label class="form-label">Select Pickup Time</label>
+                            <select class="form-select" id="time-slot-select" required>
+                                <option value="">Select a time slot</option>
+                                <!-- Time slots will be loaded here -->
+                            </select>
+                        </div>
+                        <div class="alert alert-info">
+                            <small>Please note that orders must be picked up within the selected time slot.</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Place Order</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        let products = [];
+        let cart = [];
+        let authToken = localStorage.getItem('token');
+        let currentUser = null;
+
+        // DOM Elements
+        const productsContainer = document.getElementById('products-container');
+        const cartItems = document.getElementById('cart-items');
+        const cartTotal = document.getElementById('cart-total');
+        const checkoutBtn = document.getElementById('checkout-btn');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const checkoutForm = document.getElementById('checkout-form');
+        const timeSlotSelect = document.getElementById('time-slot-select');
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            loadProducts();
+            loadTimeSlots();
+            loadCart();
+            setupEventListeners();
+            checkAuthStatus();
+        });
+
+        // Event Listeners
+        function setupEventListeners() {
+            // Login form submission
+            if (loginForm) {
+                loginForm.addEventListener('submit', handleLogin);
+            }
+
+            // Register form submission
+            if (registerForm) {
+                registerForm.addEventListener('submit', handleRegister);
+            }
+
+            // Checkout button
+            if (checkoutBtn) {
+                checkoutBtn.addEventListener('click', () => {
+                    if (!authToken) {
+                        alert('Please login to continue');
+                        return;
+                    }
+                    const checkoutModal = new bootstrap.Modal(document.getElementById('checkoutModal'));
+                    checkoutModal.show();
+                });
+            }
+
+            // Checkout form submission
+            if (checkoutForm) {
+                checkoutForm.addEventListener('submit', handleCheckout);
+            }
+        }
+
+        // Check authentication status
+        function checkAuthStatus() {
+            if (authToken) {
+                // Update UI for logged-in user
+                document.querySelector('.navbar .btn-group').innerHTML = `
+                    <span class="btn btn-outline-light">Welcome, ${currentUser?.username || 'User'}</span>
+                    <button class="btn btn-danger" id="logout-btn">Logout</button>
+                `;
+                document.getElementById('logout-btn').addEventListener('click', handleLogout);
+            }
+        }
+
+        // Load products from API
+        async function loadProducts() {
+            try {
+                const response = await fetch('/api/products/');
+                products = await response.json();
+                renderProducts();
+            } catch (error) {
+                console.error('Error loading products:', error);
+            }
+        }
+
+        // Load available time slots
+        async function loadTimeSlots() {
+            if (!timeSlotSelect) return;
+            
+            try {
+                const response = await fetch('/api/time-slots/available/');
+                const timeSlots = await response.json();
+                
+                timeSlotSelect.innerHTML = '<option value="">Select a time slot</option>';
+                timeSlots.forEach(slot => {
+                    const option = document.createElement('option');
+                    option.value = slot.id;
+                    option.textContent = `${new Date(slot.start_time).toLocaleString()} - ${new Date(slot.end_time).toLocaleTimeString()}`;
+                    timeSlotSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading time slots:', error);
+            }
+        }
+
+        // Render products
+        function renderProducts() {
+            if (!productsContainer) return;
+            
+            productsContainer.innerHTML = '';
+            products.forEach(product => {
+                const productCard = document.createElement('div');
+                productCard.className = 'col-md-4 mb-4';
+                productCard.innerHTML = `
+                    <div class="card product-card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">${product.name}</h5>
+                            <p class="card-text">${product.description || 'No description available'}</p>
+                            <p class="card-text"><strong>Price: ₹${product.price.toFixed(2)}</strong></p>
+                            <p class="card-text"><small class="text-muted">In stock: ${product.stock}</small></p>
+                            <button class="btn btn-primary btn-sm add-to-cart" data-id="${product.id}">
+                                Add to Cart
+                            </button>
+                        </div>
+                    </div>
+                `;
+                productsContainer.appendChild(productCard);
+            });
+
+            // Add event listeners to Add to Cart buttons
+            document.querySelectorAll('.add-to-cart').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const productId = parseInt(e.target.dataset.id);
+                    addToCart(productId);
+                });
+            });
+        }
+
+        // Cart functions
+        function addToCart(productId) {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            const existingItem = cart.find(item => item.id === productId);
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                cart.push({
+                    id: product.id,
+                    name: product.name,
+                    price: product.price,
+                    quantity: 1
+                });
+            }
+            
+            saveCart();
+            renderCart();
+        }
+
+        function removeFromCart(productId) {
+            cart = cart.filter(item => item.id !== productId);
+            saveCart();
+            renderCart();
+        }
+
+        function updateQuantity(productId, quantity) {
+            const item = cart.find(item => item.id === productId);
+            if (item) {
+                item.quantity = quantity;
+                if (item.quantity <= 0) {
+                    removeFromCart(productId);
+                } else {
+                    saveCart();
+                    renderCart();
+                }
+            }
+        }
+
+        function saveCart() {
+            localStorage.setItem('cart', JSON.stringify(cart));
+            checkoutBtn.disabled = cart.length === 0;
+        }
+
+        function loadCart() {
+            const savedCart = localStorage.getItem('cart');
+            if (savedCart) {
+                cart = JSON.parse(savedCart);
+                renderCart();
+            }
+            checkoutBtn.disabled = cart.length === 0;
+        }
+
+        function renderCart() {
+            if (!cartItems) return;
+            
+            if (cart.length === 0) {
+                cartItems.innerHTML = '<p class="text-muted">Your cart is empty</p>';
+                cartTotal.textContent = '₹0.00';
+                return;
+            }
+
+            let total = 0;
+            cartItems.innerHTML = '';
+            
+            cart.forEach(item => {
+                const itemTotal = item.price * item.quantity;
+                total += itemTotal;
+                
+                const itemElement = document.createElement('div');
+                itemElement.className = 'cart-item';
+                itemElement.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0">${item.name}</h6>
+                            <small class="text-muted">₹${item.price.toFixed(2)} × ${item.quantity}</small>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="me-2">₹${itemTotal.toFixed(2)}</span>
+                            <button class="btn btn-sm btn-outline-danger remove-item" data-id="${item.id}">×</button>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-secondary btn-sm me-1" onclick="updateQuantity(${item.id}, ${item.quantity - 1})">-</button>
+                        <span>${item.quantity}</span>
+                        <button class="btn btn-sm btn-outline-secondary btn-sm ms-1" onclick="updateQuantity(${item.id}, ${item.quantity + 1})">+</button>
+                    </div>
+                `;
+                cartItems.appendChild(itemElement);
+            });
+
+            cartTotal.textContent = `₹${total.toFixed(2)}`;
+
+            // Add event listeners to remove buttons
+            document.querySelectorAll('.remove-item').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const productId = parseInt(e.target.dataset.id);
+                    removeFromCart(productId);
+                });
+            });
+        }
+
+        // Authentication handlers
+        async function handleLogin(e) {
+            e.preventDefault();
+            const formData = new FormData(loginForm);
+            
+            try {
+                const response = await fetch('/api/auth/login/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: formData.get('username'),
+                        password: formData.get('password')
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.token;
+                    currentUser = data.user;
+                    localStorage.setItem('token', authToken);
+                    localStorage.setItem('user', JSON.stringify(currentUser));
+                    
+                    // Close the modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+                    modal.hide();
+                    
+                    // Update UI
+                    checkAuthStatus();
+                    alert('Login successful!');
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Login failed. Please check your credentials.');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('An error occurred during login.');
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const formData = new FormData(registerForm);
+            
+            if (formData.get('password1') !== formData.get('password2')) {
+                alert('Passwords do not match');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/register/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: formData.get('username'),
+                        email: formData.get('email'),
+                        password: formData.get('password1'),
+                        user_type: 'student',
+                        phone_number: formData.get('phone_number')
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Registration successful! Please login.');
+                    // Switch to login modal
+                    const registerModal = bootstrap.Modal.getInstance(document.getElementById('registerModal'));
+                    registerModal.hide();
+                    const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+                    loginModal.show();
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Registration failed. Please try again.');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                alert('An error occurred during registration.');
+            }
+        }
+
+        function handleLogout() {
+            fetch('/api/auth/logout/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${authToken}`,
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(() => {
+                authToken = null;
+                currentUser = null;
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                
+                // Reset UI
+                document.querySelector('.navbar .btn-group').innerHTML = `
+                    <button class="btn btn-light me-2" data-bs-toggle="modal" data-bs-target="#loginModal">Login</button>
+                    <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#registerModal">Register</button>
+                `;
+                
+                // Re-attach event listeners
+                setupEventListeners();
+            })
+            .catch(error => {
+                console.error('Logout error:', error);
+            });
+        }
+
+        // Checkout handler
+        async function handleCheckout(e) {
+            e.preventDefault();
+            
+            if (!authToken) {
+                alert('Please login to continue');
+                return;
+            }
+            
+            const timeSlotId = timeSlotSelect.value;
+            if (!timeSlotId) {
+                alert('Please select a pickup time slot');
+                return;
+            }
+            
+            const orderItems = cart.map(item => ({
+                product: item.id,
+                quantity: item.quantity
+            }));
+            
+            try {
+                const response = await fetch('/api/orders/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Token ${authToken}`,
+                    },
+                    body: JSON.stringify({
+                        pickup_time_slot: parseInt(timeSlotId),
+                        items: orderItems
+                    })
+                });
+                
+                if (response.ok) {
+                    const order = await response.json();
+                    alert(`Order placed successfully! Your order ID is #${order.id}`);
+                    
+                    // Clear cart
+                    cart = [];
+                    saveCart();
+                    renderCart();
+                    
+                    // Close the modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('checkoutModal'));
+                    modal.hide();
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Failed to place order. Please try again.');
+                }
+            } catch (error) {
+                console.error('Checkout error:', error);
+                alert('An error occurred during checkout.');
+            }
+        }
+    </script>
+</body>
+</html>
